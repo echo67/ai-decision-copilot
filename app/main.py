@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-st.set_page_config(page_title="AI Decision Copilot")
+st.set_page_config(page_title="AI Decision Copilot", layout="wide")
 
 st.title("🚀 AI Decision Copilot")
 
@@ -19,11 +20,27 @@ df = pd.read_csv(uploaded_file)
 st.success("파일 업로드 완료!")
 
 st.subheader("데이터 정보")
-col1, col2 = st.columns(2)
+rows, cols = df.shape
+missing = df.isna().sum().sum()
+duplicate = df.duplicated().sum()
+numeric = len(df.select_dtypes(include="number").columns)
+categorical = len(df.select_dtypes(exclude="number").columns)
+col1, col2, col3 = st.columns(3)
+
 with col1:
-    st.metric("Rows", df.shape[0])
+    st.metric("Rows", rows)
 with col2:
-    st.metric("Columns", df.shape[1])
+    st.metric("Columns", cols)
+with col3:
+    st.metric("Missing", missing)
+
+col4, col5, col6 = st.columns(3)
+with col4:
+    st.metric("Duplicate", duplicate)
+with col5:
+    st.metric("Numeric", numeric)
+with col6:
+    st.metric("Categorical", categorical)
 
 st.subheader("Columns")
 st.write(df.columns.tolist())
@@ -55,10 +72,10 @@ st.dataframe(df.head())
 # ax.set_xlabel(selected_col)
 # ax.set_ylabel("Count")
 # st.pyplot(fig)
+numeric_cols = df.select_dtypes(include="number").columns
+st.sidebar.header("Visualization Settings")
 
-import plotly.express as px
-
-plot_type = st.selectbox(
+plot_type = st.sidebar.selectbox(
     "그래프 종류",
     [
         "Histogram",
@@ -67,9 +84,7 @@ plot_type = st.selectbox(
     ]
 )
 
-numeric_cols = df.select_dtypes(include="number").columns
-
-selected_col = st.selectbox(
+selected_col = st.sidebar.selectbox(
     "수치형 컬럼 선택",
     numeric_cols
 )
