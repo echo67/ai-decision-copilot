@@ -1,4 +1,6 @@
+# %%
 import streamlit as st
+import numpy as np
 import pandas as pd
 import plotly.express as px
 
@@ -15,6 +17,7 @@ if uploaded_file is None:
     st.info("CSV 파일을 업로드해주세요.")
     st.stop()
 
+uploaded_file = "/Users/eunah/Dropbox/패스트캠퍼스/Part 8 (Unicode Encoding Conflict). 정형 데이터/Chapter 03. TabNet 활용 회귀 - 부동산 가격 예측/test.csv"
 df = pd.read_csv(uploaded_file)
 
 st.success("파일 업로드 완료!")
@@ -122,5 +125,65 @@ st.plotly_chart(
     use_container_width=True
 )
 
+numeric_df = df.select_dtypes(include='number')
+corr = numeric_df.corr()
+
+
+st.subheader("Correlation Matrix")
+st.dataframe(corr)
+
+fig = px.imshow(
+    corr,
+    text_auto=".2f",
+    color_continuous_scale="RdBu_r",
+    aspect="auto"
+)
+
+fig.update_layout(
+    title="Correlation Heatmap"
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+
+threshold = st.sidebar.slider(
+    "Correlation Threshold",
+    min_value=0.50,
+    max_value=1.00,
+    value=0.80,
+    step=0.05
+)
+
+strong_corr = []
+cols = corr.columns
+
+for i in range(len(cols)):
+    for j in range(i + 1, len(cols)):  # 중복(A-B, B-A) 제거
+        value = corr.iloc[i, j]
+        if abs(value) >= threshold:
+            strong_corr.append({
+                "Variable 1": cols[i],
+                "Variable 2": cols[j],
+                "Correlation": round(value, 3)
+            })
+
+strong_corr_df = (
+    pd.DataFrame(strong_corr)
+      .sort_values(
+         by="Correlation",
+          key=lambda x: x.abs(),
+          ascending=False
+      )
+      .reset_index(drop=True)
+)
+
+st.subheader("Strong Correlation")
+st.dataframe(
+    strong_corr_df,
+    use_container_width=True
+)
 
 
