@@ -186,4 +186,44 @@ st.dataframe(
     use_container_width=True
 )
 
+st.subheader("Distribution Analysis")
+series = df[selected_col]
+mean = series.mean()
+median = series.median()
+std = series.std()
+skew = series.skew()
+kurt = series.kurt()
+missing_rate = series.isna().mean()*100
+zero_rate = (series==0).mean()*100
+
+q1 = series.quantile(0.25)
+q3 = series.quantile(0.75)
+iqr = q3 - q1
+lower = q1 - 1.5 * iqr
+upper = q3 + 1.5 * iqr
+outlier_count = ((series < lower) | (series > upper)).sum()
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Mean", f"{mean:.2f}")
+with col2:
+    st.metric("Median", f"{median:.2f}")
+with col3:
+    st.metric("Std", f"{std:.2f}")
+with col4:
+    st.metric("Skewness", f"{skew:.2f}")
+
+with col1:
+    st.metric("Kurtosis", f"{kurt:.2f}")
+with col2:
+    st.metric("Zero Rate", f"{zero_rate:.2f}")
+with col3:
+    st.metric("Missing Rate", f"{missing_rate:.2f}")
+with col4:
+    st.metric("Outlier Count", f"{outlier_count:.2f}")
+
+if abs(skew) > 1:
+    st.info("오른쪽 또는 왼쪽으로 치우친 분포입니다.")
+if zero_rate > 50:
+    st.warning("Zero-inflated 데이터일 가능성이 있습니다.")
 
