@@ -227,3 +227,87 @@ if abs(skew) > 1:
 if zero_rate > 50:
     st.warning("Zero-inflated 데이터일 가능성이 있습니다.")
 
+score = 100
+outlier_rate = outlier_count/len(series)
+
+if missing_rate > 5:
+    score -= 20
+if zero_rate > 70:
+    score -= 15
+if outlier_rate > 5:
+    score -= 20
+if abs(skew) > 2:
+    score -= 15
+if abs(kurt) > 7:
+    score -= 10
+
+score = max(score, 0)
+
+if score >= 90:
+    level = "🟢 Excellent"
+elif score >= 70:
+    level = "🟡 Good"
+elif score >= 50:
+    level = "🟠 Needs Review"
+else:
+    level = "🔴 Poor"
+
+st.subheader("Distribution Health")
+st.write(score)
+st.write(level)
+
+## 
+st.sidebar.header("Model selection")
+model_type = st.sidebar.selectbox(
+    "모델 종류",
+    [
+        "Logistic Regression",
+        "Random Forest"
+    ]
+)
+target = st.select_slider(
+    "Target",
+    numeric_cols
+)
+
+X = df.drop(columns=[target])
+y = df[target]
+
+X = X.select_dtypes(include = "number")
+data = pd.concat([X,y], axis=1)
+data = data.dropna()
+X = data.drop(columns=[target])
+y = data[target]
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+
+if st.button("Train model"):
+    if model_type == "Random Forest":
+        model = RandomForestClassifier(
+            random_state=42
+        )
+    elif model_type == "Logistic Regression":
+        model = LogisticRegression(
+            random_state=42
+        )
+    model.fit(X_train, y_train)
+    pred = model.predict(X_test)
+    acc = accuracy_score(y_test, pred)
+    pred_prob = model.predict_proba(X_test)
+    pred_prob[:, 1]
+    st.metric(
+        "Accuracy",
+        f"{acc:.3f}"
+    )
+
+
+# %%
