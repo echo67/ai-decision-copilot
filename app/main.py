@@ -743,6 +743,26 @@ if st.button(
             f"모델 학습 중 오류가 발생했습니다: {error}"
         )
         st.stop()
+    
+    st.session_state["model_result"] = {
+        "model": model,
+        "X_test": X_test,
+        "y_test": y_test,
+        "y": y,
+        "predictions": predictions,
+        "selected_features": selected_features,
+        "model_type": model_type,
+    }
+
+if "model_result" in st.session_state:
+    result = st.session_state["model_result"]
+    model = result["model"]
+    X_test = result["X_test"]
+    y_test = result["y_test"]
+    y= result["y"]
+    predictions = result["predictions"]
+    selected_features = result["selected_features"]
+    trained_model_type = result["model_type"]
 
     accuracy = accuracy_score(
         y_test,
@@ -940,6 +960,89 @@ if st.button(
             & (result_df["Prediction"] == negative_class)
         ]
 
+        # =========================================================
+        # False Positive vs False Negative Feature Comparison
+        # =========================================================
+        st.subheader("FP vs FN Feature Comparison")
+
+        # Actual, Prediction을 제외한 수치형 Feature만 선택
+        comparison_features = [
+            column
+            for column in selected_features
+            if column in result_df.columns
+            and pd.api.types.is_numeric_dtype(result_df[column])
+        ]
+
+        if false_positive_df.empty and false_negative_df.empty:
+            st.success(
+                "False Positive와 False Negative가 모두 없어 "
+                "Feature 평균을 비교할 데이터가 없습니다."
+            )
+
+        elif not comparison_features:
+            st.info("평균을 비교할 수치형 Feature가 없습니다.")
+
+        else:
+            fp_feature_mean = (
+                false_positive_df[comparison_features]
+                .mean()
+                .rename("False Positive Mean")
+            )
+
+            fn_feature_mean = (
+                false_negative_df[comparison_features]
+                .mean()
+                .rename("False Negative Mean")
+            )
+
+            feature_comparison_df = pd.concat(
+                [
+                    fp_feature_mean,
+                    fn_feature_mean,
+                ],
+                axis=1,
+            )
+
+            # FP 평균과 FN 평균의 차이
+            feature_comparison_df["Mean Difference"] = (
+                feature_comparison_df["False Positive Mean"]
+                - feature_comparison_df["False Negative Mean"]
+            )
+
+            feature_comparison_df["Absolute Difference"] = (
+                feature_comparison_df["Mean Difference"].abs()
+            )
+
+            feature_comparison_df = (
+                feature_comparison_df
+                .reset_index()
+                .rename(columns={"index": "Feature"})
+                .sort_values(
+                    by="Absolute Difference",
+                    ascending=False,
+                )
+                .reset_index(drop=True)
+            )
+
+            st.caption(
+                f"False Positive {len(false_positive_df):,}건과 "
+                f"False Negative {len(false_negative_df):,}건의 "
+                "Feature 평균을 비교합니다."
+            )
+
+            st.dataframe(
+                feature_comparison_df.style.format(
+                    {
+                        "False Positive Mean": "{:.3f}",
+                        "False Negative Mean": "{:.3f}",
+                        "Mean Difference": "{:.3f}",
+                        "Absolute Difference": "{:.3f}",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
         st.subheader("Error Analysis")
 
         error_type = st.selectbox(
@@ -1023,9 +1126,12 @@ if st.button(
             use_container_width=True,
         )
 
-    if model_type == "Random Forest":
+if (
+    "model_result" in st.session_state
+    and st.session_state["model_result"]["model_type"]
+    == "Random Forest"
+):
         st.subheader("Feature Importance")
-
         feature_importance = (
             pd.DataFrame(
                 {
@@ -1040,29 +1146,52 @@ if st.button(
             .reset_index(drop=True)
         )
 
-        importance_figure = px.bar(
-            feature_importance,
-            x="Importance",
-            y="Feature",
-            orientation="h",
-            title="Random Forest Feature Importance",
+        importance_threshold = st.sidebar.slider(
+            "Importance Threshold",
+            min_value=0.0,
+            max_value=0.5,
+            value=0.01,
+            step=0.01,
+            key="feature_importance_threshold",
         )
-
-        importance_figure.update_layout(
-            yaxis={
-                "categoryorder": "total ascending",
-            },
-            template="plotly_white",
-            height=max(
-                400,
-                len(selected_features) * 30,
-            ),
-        )
-
-        st.plotly_chart(
-            importance_figure,
-            use_container_width=True,
-        )
+        filtered_feature_importance = feature_importance[
+            feature_importance["Importance"] >= importance_threshold
+        ].copy()
+        if filtered_feature_importance.empty:
+            st.info(
+                f"Importance가 {importance_threshold:.2f} 이상인 "
+                "Feature가 없습니다."
+            )
+        else:
+            importance_figure = px.bar(
+                filtered_feature_importance,
+                x="Importance",
+                y="Feature",
+                orientation="h",
+                title=(
+                    "Feature Importance "
+                    f"(Threshold ≥ {importance_threshold:.2f})"
+                ),
+            )
+            importance_figure.update_layout(
+                yaxis={
+                    "categoryorder": "total ascending",
+                },
+                template="plotly_white",
+                height=max(
+                    400,
+                    len(filtered_feature_importance) * 35,
+                ),
+            )
+            st.plotly_chart(
+                importance_figure,
+                use_container_width=True,
+            )
+            st.dataframe(
+                filtered_feature_importance,
+                use_container_width=True,
+                hide_index=True,
+            )
 
 
 # %%
