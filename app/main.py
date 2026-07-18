@@ -12,6 +12,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     roc_auc_score,
+    confusion_matrix
 )
 from sklearn.model_selection import train_test_split
 
@@ -856,6 +857,171 @@ if st.button(
         use_container_width=True,
         hide_index=True,
     )
+
+    # =========================================================
+    # Confusion Matrix and Error Analysis
+    # =========================================================
+    st.subheader("Confusion Matrix")
+
+    if y.nunique() == 2:
+        cm = confusion_matrix(
+            y_test,
+            predictions,
+            labels=model.classes_,
+        )
+
+        tn, fp, fn, tp = cm.ravel()
+
+        confusion_columns = st.columns(4)
+
+        with confusion_columns[0]:
+            st.metric("True Positive", f"{tp:,}")
+
+        with confusion_columns[1]:
+            st.metric("False Positive", f"{fp:,}")
+
+        with confusion_columns[2]:
+            st.metric("False Negative", f"{fn:,}")
+
+        with confusion_columns[3]:
+            st.metric("True Negative", f"{tn:,}")
+
+        # Confusion matrix 시각화
+        confusion_figure = px.imshow(
+            cm,
+            text_auto=True,
+            x=[
+                f"Predicted {model.classes_[0]}",
+                f"Predicted {model.classes_[1]}",
+            ],
+            y=[
+                f"Actual {model.classes_[0]}",
+                f"Actual {model.classes_[1]}",
+            ],
+            title="Confusion Matrix",
+            aspect="auto",
+            color_continuous_scale="Blues",
+        )
+
+        confusion_figure.update_layout(
+            template="plotly_white",
+            coloraxis_showscale=False,
+            height=450,
+        )
+
+        st.plotly_chart(
+            confusion_figure,
+            use_container_width=True,
+        )
+
+        # 예측 결과 데이터 생성
+        result_df = X_test.copy()
+
+        result_df["Actual"] = y_test.to_numpy()
+        result_df["Prediction"] = predictions
+
+        if "prediction_probabilities" in locals():
+            result_df["Prediction Probability"] = (
+                prediction_probabilities
+            )
+
+        negative_class = model.classes_[0]
+        positive_class = model.classes_[1]
+
+        # False Positive
+        false_positive_df = result_df[
+            (result_df["Actual"] == negative_class)
+            & (result_df["Prediction"] == positive_class)
+        ]
+
+        # False Negative
+        false_negative_df = result_df[
+            (result_df["Actual"] == positive_class)
+            & (result_df["Prediction"] == negative_class)
+        ]
+
+        st.subheader("Error Analysis")
+
+        error_type = st.selectbox(
+            "Error Type",
+            [
+                "False Positive",
+                "False Negative",
+            ],
+            key="classification_error_type",
+        )
+
+        if error_type == "False Positive":
+            st.write(
+                f"실제 클래스는 `{negative_class}`이지만 "
+                f"`{positive_class}`로 잘못 예측한 데이터: "
+                f"**{len(false_positive_df):,}건**"
+            )
+
+            if false_positive_df.empty:
+                st.success("False Positive가 없습니다.")
+            else:
+                st.dataframe(
+                    false_positive_df,
+                    use_container_width=True,
+                )
+
+        else:
+            st.write(
+                f"실제 클래스는 `{positive_class}`이지만 "
+                f"`{negative_class}`로 잘못 예측한 데이터: "
+                f"**{len(false_negative_df):,}건**"
+            )
+
+            if false_negative_df.empty:
+                st.success("False Negative가 없습니다.")
+            else:
+                st.dataframe(
+                    false_negative_df,
+                    use_container_width=True,
+                )
+
+    else:
+        st.info(
+            "TP, FP, FN, TN 기반 오류 분석은 현재 이진 분류에서만 제공합니다. "
+            "다중 클래스 문제에서는 전체 Confusion Matrix를 확인하세요."
+        )
+
+        multiclass_cm = confusion_matrix(
+            y_test,
+            predictions,
+            labels=model.classes_,
+        )
+
+        multiclass_figure = px.imshow(
+            multiclass_cm,
+            text_auto=True,
+            x=[
+                f"Predicted {class_name}"
+                for class_name in model.classes_
+            ],
+            y=[
+                f"Actual {class_name}"
+                for class_name in model.classes_
+            ],
+            title="Multiclass Confusion Matrix",
+            aspect="auto",
+            color_continuous_scale="Blues",
+        )
+
+        multiclass_figure.update_layout(
+            template="plotly_white",
+            coloraxis_showscale=False,
+            height=max(
+                450,
+                len(model.classes_) * 60,
+            ),
+        )
+
+        st.plotly_chart(
+            multiclass_figure,
+            use_container_width=True,
+        )
 
     if model_type == "Random Forest":
         st.subheader("Feature Importance")
